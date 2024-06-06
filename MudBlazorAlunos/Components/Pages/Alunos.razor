@@ -1,0 +1,132 @@
+@page "/alunos"
+@rendermode InteractiveServer
+
+<MudDialogProvider />
+<MudSnackbarProvider />
+<EditForm Model="aluno" FormName="AlunoForm" OnValidSubmit="Salvar">
+    <DataAnnotationsValidator />
+    <MudCard Elevation="25">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h5" Color="Color.Primary">Incluir e Editar Alunos</MudText>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Default" />
+            </CardHeaderActions>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudTextField @bind-Value="aluno.Nome" Label="Nome" Variant="Variant.Outlined" Margin="Margin.Dense"
+                Required="true" For="@(() => aluno.Nome)" />
+            <MudTextField @bind-Value="aluno.Email" Label="Email" Variant="Variant.Text" Margin="Margin.Normal"
+                Required="true" For="@(() => aluno.Email)" />
+            <MudNumericField @bind-Value="aluno.Idade" Label="Idade" Variant="Variant.Filled" Margin="Margin.Normal" />
+            <br>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary">
+                Salvar Aluno
+            </MudButton>
+        </MudCardContent>
+    </MudCard>
+</EditForm>
+
+<br>
+
+<MudTable Elevation="25" Striped="true" Items="alunos" Filter="new Func<Aluno, bool>(Procurar)" Dense="true"
+    Loading="@loading" FixedFooter="true" FixedHeader="true" Height="500px">
+    <ToolBarContent>
+        <MudText Typo="Typo.h5">Alunos</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="criterio" Placeholder="Procurar alunos..." Adornment="Adornment.Start"
+            AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0">
+        </MudTextField>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<Aluno, object>(x=>x.Nome!)">Nome</MudTableSortLabel>
+        </MudTh>
+        <MudTh>Email</MudTh>
+        <MudTh>
+            <MudTableSortLabel SortBy="new Func<Aluno, object>(x=>x.Idade!)">Idade</MudTableSortLabel>
+        </MudTh>
+        <MudTh>Operação</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+        <MudTd DataLabel="Email">@context.Email</MudTd>
+        <MudTd DataLabel="Idade">@context.Idade</MudTd>
+        <MudTd DataLabel="">
+            <MudFab @onclick="@(e => Editar(@context.Id))" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                Size="Size.Small" IconSize="Size.Small" Title="Editar registro" />
+            <MudFab @onclick="@(e => ConfirmarExclusao(@context.Id))" Color="Color.Secondary"
+                StartIcon="@Icons.Material.Filled.Delete" Size="Size.Small" IconSize="Size.Small"
+                Title="Excluir registro" />
+        </MudTd>
+    </RowTemplate>
+
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] { 25, 50, 100, int.MaxValue}" RowsPerPageString="Registros por página"
+            InfoFormat="{first_item}-{last_item} de {all_items}" />
+    </PagerContent>
+</MudTable>
+
+@code {
+    private Aluno aluno { get; set; } = new();
+    private IEnumerable<Aluno> alunos = new List<Aluno>();
+    private string criterio = string.Empty;
+    private bool loading = true;
+    protected override async Task OnInitializedAsync()
+    {
+        await GetAlunos();
+    }
+
+    private async Task<IEnumerable<Aluno>> GetAlunos()
+    {
+        loading = true;
+        alunos = await alunoService.GetAllAlunos();
+        loading = false;
+        return alunos;
+    }
+
+    private bool Procurar(Aluno aluno)
+    {
+        if (string.IsNullOrWhiteSpace(criterio)) return true;
+        if (aluno.Nome!.Contains(criterio, StringComparison.OrdinalIgnoreCase)
+        || aluno.Email!.Contains(criterio, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    private async Task Salvar()
+    {
+        await alunoService.SalvarAluno(aluno);
+        aluno = new();
+        snackBar.Configuration.PositionClass = Defaults.Classes.Position.TopCenter;
+        snackBar.Add("Aluno salvo.", Severity.Success);
+        await GetAlunos();
+        StateHasChanged();
+    }
+
+    private void Editar(int id)
+    {
+        aluno = alunos.FirstOrDefault(c => c.Id == id)!;
+    }
+
+    private async Task ConfirmarExclusao(int id)
+    {
+        bool? result = await _dialogService.ShowMessageBox("Confirma exclusão",
+        "A exclusão não poderá ser desfeita", yesText: "Deleta", cancelText: "Cancela");
+
+        if (result ?? false)
+        {
+            await Deleta(id);
+        }
+    }
+
+    private async Task Deleta(int id)
+    {
+        await alunoService.DeletarAluno(id);
+        snackBar.Add("Aluno Excluído.", Severity.Warning);
+        await GetAlunos();
+    }
+}
